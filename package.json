@@ -1,0 +1,26 @@
+{
+  "name": "creativesketchtemplate",
+  "version": "1.0.0",
+  "description": "A (hopefully) quicker way to stand up a Javascript creative coding environment",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "clean": "rm -rf node_modules"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kylestew/CreativeSketchTemplate.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dat.gui": "^0.7.7",
+    "stats.js": "^0.17.0",
+    "three": "^0.136.0"
+  },
+  "devDependencies": {
+    "vite": "^2.7.2"
+  }
+}
