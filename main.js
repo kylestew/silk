@@ -26,7 +26,7 @@ function init() {
 
   createGUI(state);
 
-  capture = new CCapture({ format: "png" });
+  capture = new CCapture({ framerate: 30, format: "png" });
 
   stats = new Stats();
   stats.showPanel(0);

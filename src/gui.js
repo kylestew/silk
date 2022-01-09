@@ -4,7 +4,7 @@ function createGUI(state) {
   const gui = new dat.GUI();
 
   var optionsFolder = gui.addFolder("Options");
-  optionsFolder.open();
+  // optionsFolder.open();
 
   optionsFolder
     .addColor(state, "backgroundColor")
