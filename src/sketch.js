@@ -9,9 +9,9 @@ import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectio
 import { LUTPass } from "three/examples/jsm/postprocessing/LUTPass.js";
 import { LUTCubeLoader } from "three/examples/jsm/loaders/LUTCubeLoader";
 
-import vertexShader from "./shaders/shader.vert";
-import fragmentShader from "./shaders/shader.frag";
 import lutUrl from "/assets/luts/Everyday_Pro_Color.cube?url";
+
+import noiseShaderChunk from "./shaders/utils/simplex-noise-3d.glsl?raw";
 
 class Sketch {
   constructor() {
@@ -34,40 +34,35 @@ class Sketch {
     let scene = new THREE.Scene();
     // scene.background = new THREE.Color(backgroundColor);
 
-    // TODO: allow swapping mat cap texture
-    const matCapTex = new THREE.TextureLoader().load(
-      // "assets/matcap/161B1F_C7E0EC_90A5B3_7B8C9B.png"
-      // "assets/matcap/167E76_36D6D2_23B2AC_27C1BE.png"
-      // "assets/matcap/245642_3D8168_3D6858_417364.png"
-      // "assets/matcap/3E2335_D36A1B_8E4A2E_2842A5.png"
-      // "assets/matcap/3F3A2F_91D0A5_7D876A_94977B.png"
-      "assets/matcap/8A6565_2E214D_D48A5F_ADA59C.png"
-      // "assets/matcap/555555_C8C8C8_8B8B8B_A4A4A4.png"
-    );
+    // const geometry = new THREE.PlaneGeometry(1, 1.777);
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    const material = new THREE.MeshNormalMaterial();
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.u_time = { value: 0 };
 
-    const geometry = new THREE.PlaneGeometry(1, 1.777);
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        u_time: {
-          type: "f",
-          value: 0,
-        },
-        u_amplitude: {
-          type: "f",
-          value: 1.0,
-        },
-        u_frequency: {
-          type: "f",
-          value: 3.0,
-        },
-        u_matCapTex: {
-          type: "t",
-          value: matCapTex,
-        },
-      },
-    });
+      // override normal map and generate noise texture in frag shader
+      shader.vertexShader = "#define USE_UV\n" + shader.vertexShader;
+
+      shader.fragmentShader = [
+        "#define USE_UV",
+        noiseShaderChunk,
+        "uniform float u_time;",
+        shader.fragmentShader,
+      ].join("\n");
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        [
+          "normal = vec3(snoise(vec3(vUv, u_time)), 0, 0);",
+          // "float xDistortion = snoise(vec4(vPosition * u_frequency, u_time)) * u_amplitude;",
+          // "float yDistortion = snoise(vec4(vPosition * u_frequency, u_time * 2.)) * u_amplitude;",
+          // "float zDistortion = snoise(vec4(vPosition * u_frequency, u_time * 0.5)) * u_amplitude;",
+          // "vec3 normal = normalize(vec3(xDistortion * 0.5 + 0.0, yDistortion * 0.5 + 0.0, zDistortion * 0.5 + 0.0));"
+        ].join("\n")
+      );
+
+      material.userData.shader = shader;
+    };
     const cube = new THREE.Mesh(geometry, material);
     scene.add(cube);
 
@@ -104,14 +99,18 @@ class Sketch {
   }
 
   _update(time, deltaTime, {}) {
-    this.material.uniforms.u_time.value = time / 4.0;
+    const shader = this.material.userData.shader;
+    if (shader) {
+      shader.uniforms.u_time.value = time / 4.0;
+    }
+
     this.controls.update();
   }
 
   render(time, deltaTime, state) {
     this._update(time, deltaTime, state);
-    // this.renderer.render(this.scene, this.camera);
-    this.composer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.camera);
+    // this.composer.render(this.scene, this.camera);
   }
 }
 
