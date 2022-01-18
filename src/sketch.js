@@ -40,24 +40,35 @@ class Sketch {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.u_time = { value: 0 };
 
-      // override normal map and generate noise texture in frag shader
+      /* == EXTEND THREE JS SHADER ==
+       * override normal map and generate noise texture in frag shader
+       */
+
+      // enable UVs even though we haven't set a normal map
       shader.vertexShader = "#define USE_UV\n" + shader.vertexShader;
 
+      // inject noise functions into fragment shader
+      // include extra uniforms
       shader.fragmentShader = [
         "#define USE_UV",
         noiseShaderChunk,
+        "#define PI 3.14159",
         "uniform float u_time;",
         shader.fragmentShader,
       ].join("\n");
 
+      // override normal map shader chunk
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <normal_fragment_maps>",
         [
-          "normal = vec3(snoise(vec3(vUv, u_time)), 0, 0);",
-          // "float xDistortion = snoise(vec4(vPosition * u_frequency, u_time)) * u_amplitude;",
-          // "float yDistortion = snoise(vec4(vPosition * u_frequency, u_time * 2.)) * u_amplitude;",
-          // "float zDistortion = snoise(vec4(vPosition * u_frequency, u_time * 0.5)) * u_amplitude;",
-          // "vec3 normal = normalize(vec3(xDistortion * 0.5 + 0.0, yDistortion * 0.5 + 0.0, zDistortion * 0.5 + 0.0));"
+          // orient normal in spherical coordinates
+          "float theta = snoise(vec3(vUv, cos(u_time))) * PI;",
+          "float phi = snoise(vec3(vUv, sin(u_time))) * PI;",
+          // convert spherical to cartesian normal
+          "float xn = cos(theta) * cos(phi);",
+          "float yn = sin(theta) * cos(phi);",
+          "float zn = sin(theta);",
+          "normal = normalize(vec3(xn, yn, zn));",
         ].join("\n")
       );
 
