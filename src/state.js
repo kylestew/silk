@@ -11,10 +11,10 @@ const state = {
 
   metalness: 0,
   roughness: 0.3,
-  transmission: 1,
+  transmission: 0.5,
   ior: 1.6,
   reflectivity: 0.6,
-  thickness: 4.0,
+  thickness: 1.0,
   envMapIntensity: 2.0,
   clearcoat: 1,
   clearcoatRoughness: 0.1,
