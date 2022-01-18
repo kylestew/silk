@@ -31,18 +31,18 @@ class Sketch {
     this.controls.maxDistance = 20;
     this.controls.enabled = true;
 
+    /*
     let scene = new THREE.Scene();
     // scene.background = new THREE.Color(backgroundColor);
 
     // const geometry = new THREE.PlaneGeometry(1, 1.777);
     const geometry = new THREE.PlaneGeometry(1, 1);
-    const material = new THREE.MeshNormalMaterial();
+    const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
     material.onBeforeCompile = (shader) => {
       shader.uniforms.u_time = { value: 0 };
 
-      /* == EXTEND THREE JS SHADER ==
-       * override normal map and generate noise texture in frag shader
-       */
+      // == EXTEND THREE JS SHADER ==
+      // override normal map and generate noise texture in frag shader
 
       // enable UVs even though we haven't set a normal map
       shader.vertexShader = "#define USE_UV\n" + shader.vertexShader;
@@ -52,7 +52,6 @@ class Sketch {
       shader.fragmentShader = [
         "#define USE_UV",
         noiseShaderChunk,
-        "#define PI 3.14159",
         "uniform float u_time;",
         shader.fragmentShader,
       ].join("\n");
@@ -62,8 +61,8 @@ class Sketch {
         "#include <normal_fragment_maps>",
         [
           // orient normal in spherical coordinates
-          "float theta = snoise(vec3(vUv, cos(u_time))) * PI;",
-          "float phi = snoise(vec3(vUv, sin(u_time))) * PI;",
+          "float theta = snoise(vec3(vUv, cos(u_time)) * 2.0) * PI / 2.0;",
+          "float phi = snoise(vec3(vUv, sin(u_time)) * 2.0) * PI / 2.0;",
           // convert spherical to cartesian normal
           "float xn = cos(theta) * cos(phi);",
           "float yn = sin(theta) * cos(phi);",
@@ -76,6 +75,12 @@ class Sketch {
     };
     const cube = new THREE.Mesh(geometry, material);
     scene.add(cube);
+
+    // const light = new THREE.AmbientLight(0x404040); // soft white light
+    // scene.add(light);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    scene.add(directionalLight);
 
     this.material = material;
     this.scene = scene;
@@ -94,13 +99,14 @@ class Sketch {
     });
 
     this.composer = composer;
+    */
   }
 
   resize({ width, height, dpr }) {
     this.size = [width, height];
     this.renderer.setPixelRatio = dpr;
     this.renderer.setSize(width, height);
-    this.composer.setSize(width, height);
+    // this.composer.setSize(width, height);
     this.camera.aspect = width / innerHeight;
     this.camera.updateProjectionMatrix();
   }
@@ -110,17 +116,17 @@ class Sketch {
   }
 
   _update(time, deltaTime, {}) {
-    const shader = this.material.userData.shader;
-    if (shader) {
-      shader.uniforms.u_time.value = time / 4.0;
-    }
+    // const shader = this.material.userData.shader;
+    // if (shader) {
+    //   shader.uniforms.u_time.value = time / 4.0;
+    // }
 
     this.controls.update();
   }
 
   render(time, deltaTime, state) {
     this._update(time, deltaTime, state);
-    this.renderer.render(this.scene, this.camera);
+    // this.renderer.render(this.scene, this.camera);
     // this.composer.render(this.scene, this.camera);
   }
 }
