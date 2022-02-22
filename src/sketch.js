@@ -4,19 +4,18 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectionShader.js";
 import { LUTPass } from "three/examples/jsm/postprocessing/LUTPass.js";
-import { LUTCubeLoader } from "three/examples/jsm/loaders/LUTCubeLoader";
 
-import vertexShader from "./shaders/shader.vert";
-import fragmentShader from "./shaders/shader.frag";
-import lutUrl from "/assets/luts/Everyday_Pro_Color.cube?url";
+import noiseShaderChunk from "./shaders/utils/simplex-noise-3d.glsl?raw";
 
 class Sketch {
   constructor() {
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: false,
     });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1;
@@ -30,88 +29,167 @@ class Sketch {
     this.controls.minDistance = 0.5;
     this.controls.maxDistance = 20;
     this.controls.enabled = true;
-
-    let scene = new THREE.Scene();
-    // scene.background = new THREE.Color(backgroundColor);
-
-    // TODO: allow swapping mat cap texture
-    const matCapTex = new THREE.TextureLoader().load(
-      // "assets/matcap/161B1F_C7E0EC_90A5B3_7B8C9B.png"
-      // "assets/matcap/167E76_36D6D2_23B2AC_27C1BE.png"
-      // "assets/matcap/245642_3D8168_3D6858_417364.png"
-      // "assets/matcap/3E2335_D36A1B_8E4A2E_2842A5.png"
-      // "assets/matcap/3F3A2F_91D0A5_7D876A_94977B.png"
-      "assets/matcap/8A6565_2E214D_D48A5F_ADA59C.png"
-      // "assets/matcap/555555_C8C8C8_8B8B8B_A4A4A4.png"
-    );
-
-    const geometry = new THREE.PlaneGeometry(1, 1.777);
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        u_time: {
-          type: "f",
-          value: 0,
-        },
-        u_amplitude: {
-          type: "f",
-          value: 1.0,
-        },
-        u_frequency: {
-          type: "f",
-          value: 3.0,
-        },
-        u_matCapTex: {
-          type: "t",
-          value: matCapTex,
-        },
-      },
-    });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-
-    this.material = material;
-    this.scene = scene;
-
-    const renderPass = new RenderPass(scene, this.camera);
-    const composer = new EffectComposer(this.renderer);
-    composer.addPass(renderPass);
-    composer.addPass(new ShaderPass(GammaCorrectionShader));
-
-    new LUTCubeLoader().load(lutUrl, (lut) => {
-      let lutPass = new LUTPass();
-      lutPass.lut = lut.texture3D;
-      lutPass.intensity = 1.2;
-      lutPass.enabled = true;
-      composer.addPass(lutPass);
-    });
-
-    this.composer = composer;
   }
 
   resize({ width, height, dpr }) {
     this.size = [width, height];
     this.renderer.setPixelRatio = dpr;
     this.renderer.setSize(width, height);
-    this.composer.setSize(width, height);
+    if (this.composer) this.composer.setSize(width, height);
     this.camera.aspect = width / innerHeight;
     this.camera.updateProjectionMatrix();
   }
 
-  updateState({ backgroundColor, cubeSize }) {
-    // apply UI params to current scene without rebuilding
+  _createPostProcessing({
+    enableFXAA,
+    enableBloom,
+    bloomStrength,
+    bloomRadius,
+    bloomThreshold,
+    lut,
+  }) {
+    const renderPass = new RenderPass(this.scene, this.camera);
+    const composer = new EffectComposer(this.renderer);
+    composer.addPass(renderPass);
+
+    if (this.size) {
+      const [width, height] = this.size;
+
+      if (enableFXAA) {
+        let fxaaPass = new ShaderPass(FXAAShader);
+        const pixelRatio = this.renderer.getPixelRatio();
+        fxaaPass.material.uniforms["resolution"].value.x =
+          1 / (width * pixelRatio);
+        fxaaPass.material.uniforms["resolution"].value.y =
+          1 / (height * pixelRatio);
+        composer.addPass(fxaaPass);
+      }
+
+      if (enableBloom) {
+        const bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(width, height),
+          bloomStrength,
+          bloomRadius,
+          bloomThreshold
+        );
+        composer.addPass(bloomPass);
+      }
+    }
+
+    composer.addPass(new ShaderPass(GammaCorrectionShader));
+
+    if (lut) {
+      let lutPass = new LUTPass();
+      lutPass.lut = lut.texture3D;
+      lutPass.intensity = 1.2;
+      lutPass.enabled = true;
+      composer.addPass(lutPass);
+    }
+
+    return composer;
+  }
+  _createMaterial({
+    envMap,
+    metalness,
+    roughness,
+    transmission,
+    ior,
+    reflectivity,
+    thickness,
+    envMapIntensity,
+    clearcoat,
+    clearcoatRoughness,
+  }) {
+    let material = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness,
+      roughness,
+      transmission,
+      ior,
+      reflectivity,
+      thickness,
+      envMap: envMap,
+      envMapIntensity,
+      clearcoat,
+      clearcoatRoughness,
+      // clearcoatNormalMap: normalMapTexture,
+      // clearcoatNormalScale: new THREE.Vector2(clearcoatNormalScale),
+    });
+
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.u_time = { value: 0 };
+
+      // == EXTEND THREE JS SHADER ==
+      // override normal map and generate noise texture in frag shader
+
+      // enable UVs even though we haven't set a normal map
+      shader.vertexShader = "#define USE_UV\n" + shader.vertexShader;
+
+      // inject noise functions into fragment shader
+      // include extra uniforms
+      shader.fragmentShader = [
+        "#define USE_UV",
+        noiseShaderChunk,
+        "uniform float u_time;",
+        shader.fragmentShader,
+      ].join("\n");
+
+      // override normal map shader chunk
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        [
+          // orient normal in spherical coordinates
+          "float theta = snoise(vec3(vUv, cos(u_time)) * 2.0) * PI / 2.0;",
+          "float phi = snoise(vec3(vUv, sin(u_time)) * 2.0) * PI / 2.0;",
+          // convert spherical to cartesian normal
+          "float xn = cos(theta) * cos(phi);",
+          "float yn = sin(theta) * cos(phi);",
+          "float zn = sin(theta);",
+          "normal = normalize(vec3(xn, yn, zn));",
+        ].join("\n")
+      );
+
+      material.userData.shader = shader;
+    };
+
+    return material;
+  }
+
+  updateState(state) {
+    let scene = new THREE.Scene();
+    scene.background = state.envMap;
+
+    const geometry = new THREE.PlaneGeometry(1, 1.777);
+    // const geometry = new THREE.PlaneGeometry(1, 1);
+    const material = this._createMaterial(state);
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+
+    this.material = material;
+    this.scene = scene;
+
+    // post processing
+    this.composer = this._createPostProcessing(state);
   }
 
   _update(time, deltaTime, {}) {
-    this.material.uniforms.u_time.value = time / 4.0;
+    if (this.material) {
+      const shader = this.material.userData.shader;
+      if (shader) {
+        shader.uniforms.u_time.value = time / 8.0;
+      }
+    }
+
     this.controls.update();
   }
 
   render(time, deltaTime, state) {
     this._update(time, deltaTime, state);
-    // this.renderer.render(this.scene, this.camera);
-    this.composer.render(this.scene, this.camera);
+    if (this.composer) {
+      this.composer.render(this.scene, this.camera);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }
 
